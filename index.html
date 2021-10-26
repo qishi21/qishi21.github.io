@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>施琪_21210980062</title>
+
+    <style>
+        #SVG {
+            background-color: FloralWhite;
+        }
+
+        .tooltip {
+            position: absolute;
+            width: auto;
+            height: auto;
+            background: #eee;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            white-space: pre;
+        }
+
+    </style>
+</head>
+
+<body>
+    <h1>Temperature Data Visualization</h1>
+    <button id="max_button", style="background-color: white">最高气温</button>
+    <button id="avg_button", style="background-color: pink">平均气温</button>
+    <button id="min_button", style="background-color: white">最低气温</button>
+
+    <br>
+    <br>
+
+    <svg id="SVG"></svg>
+
+    <!-- 引入v7版本的d3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <!-- 代码部分 -->
+    <script>
+
+        // 将作为画布的svg宽度设为900，高度为600，四周预设出60的留白
+        var width = 900;
+        var height = 600;
+        var margin = 60;
+
+        var status = 'avg_temperature';
+
+        var max_btn = document.getElementById('max_button');
+        var avg_btn = document.getElementById('avg_button');
+        var min_btn = document.getElementById('min_button');
+
+        var svg = d3.select("#SVG")
+            .attr("width", width)
+            .attr("height", height);
+
+        // 在svg下添加一个组用于包裹其他要绘制的元素
+        var group = svg.append("g");
+
+        // 添加tooltip
+        let tooltip = d3.select('body')
+            .append('div')
+            .attr('class', 'tooltip')
+            .style('opacity', '0');
+
+        // 以异步方式读入数据data.csv，后续操作都在.then()的参数函数中
+        d3.csv('data.csv').then(function (data) {
+
+            //***************** 绘制Y轴 *****************
+
+            var scaleY = d3.scaleBand()
+                .domain(data.map(d => d.month))
+                .range([0, height - 2 * margin])
+
+            // 定义Y坐标轴
+            var axisY = d3.axisLeft(scaleY);
+
+            // 在组内再创建一个组，绘制Y轴
+            group.append("g").call(axisY)
+                .attr("transform", `translate(${margin}, ${margin-30})`);
+
+            //***************** 绘制X轴 *****************
+
+            var scaleX = d3.scaleBand()
+                .domain(data.map(d => d.year))
+                .range([0, width - 2 * margin]);
+
+            var axisX = d3.axisTop(scaleX);
+
+            // 绘制X轴，多了一步将X轴下移至底部
+            group.append("g").call(axisX)
+                .attr("transform", `translate(${margin}, ${margin-30})`);
+
+            var colorScale = d3.scaleSequential(d3.interpolateYlOrRd)
+            .domain([d3.min(data, d => d['avg_temperature']), d3.max(data, d => d['avg_temperature'])]);
+
+            function add_rect() {
+                d3.selectAll('.square').remove();
+                group.append("g")
+                    .selectAll()
+                    .data(data)
+                    .enter()
+                    .append("rect")
+                    .attr("class", "square")
+                    .attr("width", 30)
+                    .attr("height", 30)
+                    .attr("x", d => scaleX(d['year']))
+                    .attr("y", d => scaleY(d['month']))
+                    .attr("transform", `translate(${margin+5}, ${margin-25})`)
+                    .attr("fill", d => colorScale(d[status]))
+                    .attr("month", d=>d['month'])
+                    .attr("temperature", d => d[status])
+                    .attr("max_temperature", d => d['max_temperature'])
+                    .attr("avg_temperature", d => d['avg_temperature'])
+                    .attr("min_temperature", d => d['min_temperature'])
+                    .on("mouseover", function(d) {
+                        d3.select(this)
+                        .attr("width", 40)
+                        .attr("height", 40)
+                        .attr("transform", `translate(${margin}, ${margin-30})`)
+                        .attr("stroke", "pink")
+                        .attr("stroke-width", 2.5);
+                        tooltip.html(" Month\t: "+d3.select(this).attr("month")+"; \n"
+                            +" Max\t: "+d3.select(this).attr("max_temperature")+"°C; \n"
+                            +" Avg\t: "+d3.select(this).attr("avg_temperature")+"°C; \n"
+                            +" Min\t: "+d3.select(this).attr("min_temperature")+"°C. ")
+                            .style("left", +d3.select(this).attr("x")+90+"px")
+                            .style("top", +d3.select(this).attr("y")+210+"px")
+                            .style("opacity", 1.0);
+                    })
+                    .on("mouseout", function(d){
+                        d3.select(this)
+                        .attr("width", 30)
+                        .attr("height", 30)
+                        .attr("transform", `translate(${margin+5}, ${margin-25})`)
+                        .attr("stroke", "none");
+                        tooltip.style("opacity", 0)
+                    });
+                
+                var data_legend = []
+                for (var i=0; i<=40.1; i+=0.1) {
+                    data_legend.push(i);
+                };
+
+                var legend_colorScale = d3.scaleSequential(d3.interpolateYlOrRd)
+                    .domain([data_legend[0], data_legend[data_legend.length-1]]);
+
+                var legend = svg.append("g");
+
+                legend.selectAll()
+                    .data(data_legend)
+                    .enter()
+                    .append("rect")
+                    .attr("class", "legend")
+                    .attr("width", 3)
+                    .attr("height", 30)
+                    .attr("x", (d,i)=>1.943*i+60)
+                    .attr("y", 530)
+                    .attr("fill", d=>legend_colorScale(d));
+
+                var legend_scale = d3.scaleLinear()
+                    .domain([d3.min(data_legend), [d3.max(data_legend)]])
+                    .range([2+60, data_legend.length*1.943+60]);
+    
+                var legend_axis = d3.axisBottom(legend_scale);
+
+                legend.append("g").call(legend_axis)
+                    .attr("class", "legend")
+                    .attr("transform", `translate(0,560)`);
+                
+            };
+
+            add_rect();
+            
+            max_btn.onclick = function() {
+                status = 'max_temperature';
+                max_btn.style.backgroundColor='pink';
+                avg_btn.style.backgroundColor='white';
+                min_btn.style.backgroundColor='white';
+                add_rect();
+
+            };
+
+            avg_btn.onclick = function() {
+                status = 'avg_temperature';
+                max_btn.style.backgroundColor='white';
+                avg_btn.style.backgroundColor='pink';
+                min_btn.style.backgroundColor='white';
+                add_rect();
+            };
+
+            min_btn.onclick = function() {
+                status = 'min_temperature';
+                max_btn.style.backgroundColor='white';
+                avg_btn.style.backgroundColor='white';
+                min_btn.style.backgroundColor='pink';
+                add_rect();
+            };
+
+        });
+
+    </script>
+</body>
+
+</html>
